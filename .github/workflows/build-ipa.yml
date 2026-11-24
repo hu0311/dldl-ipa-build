@@ -1,0 +1,54 @@
+name: Build IPA (unsigned)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          sw_vers
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Archive (no codesign)
+        run: |
+          xcodebuild archive \
+            -project YouyouguH5.xcodeproj \
+            -scheme YouyouguH5 \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/YouyouguH5.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Package Payload into IPA
+        run: |
+          mkdir -p build/Payload
+          cp -R build/YouyouguH5.xcarchive/Products/Applications/YouyouguH5.app build/Payload/
+          cd build
+          zip -qry YouyouguH5-1.0.0-unsigned.ipa Payload
+          ls -lh YouyouguH5-1.0.0-unsigned.ipa
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: YouyouguH5-unsigned-ipa
+          path: build/YouyouguH5-1.0.0-unsigned.ipa
+          if-no-files-found: error
